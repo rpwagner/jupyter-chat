@@ -40,7 +40,11 @@ export function ChatInput(props: ChatInput.IProps): JSX.Element {
   const [input, setInput] = useState<string>(model.value);
   const inputRef = useRef<HTMLInputElement>();
 
-  const chatCommands = useChatCommands(model, chatCommandRegistry);
+  // A replacement owns its command menu; do not run the stock providers twice.
+  const chatCommands = useChatCommands(
+    model,
+    chatInputFactory ? undefined : chatCommandRegistry
+  );
 
   const [sendWithShiftEnter, setSendWithShiftEnter] = useState<boolean>(
     model.config.sendWithShiftEnter ?? false

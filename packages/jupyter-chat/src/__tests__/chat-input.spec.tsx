@@ -14,7 +14,10 @@ import { createRoot, Root } from 'react-dom/client';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 import { ChatInput } from '../components/input/chat-input';
+import { ChatBody } from '../components/chat';
 import { ChatReactContext } from '../context';
+import { ChatCommandRegistry, IChatCommandRegistry } from '../registers';
+import { IChatInputFactory } from '../tokens';
 import { IConfig } from '../types';
 import { MockChatModel } from './mocks';
 
@@ -24,14 +27,31 @@ describe('ChatInput placeholder', () => {
   let container: HTMLDivElement;
   let root: Root;
 
-  const render = (config?: IConfig): MockChatModel => {
+  const render = (
+    config?: IConfig,
+    options: {
+      factory?: IChatInputFactory;
+      registry?: IChatCommandRegistry;
+      edit?: boolean;
+      onCancel?: () => void;
+    } = {}
+  ): MockChatModel => {
     const model = new MockChatModel({ config });
     act(() => {
       root.render(
         <ChatReactContext.Provider
-          value={{ model, rmRegistry: {} as IRenderMimeRegistry }}
+          value={{
+            model,
+            rmRegistry: {} as IRenderMimeRegistry,
+            chatInputFactory: options.factory,
+            chatCommandRegistry: options.registry
+          }}
         >
-          <ChatInput model={model.input} />
+          <ChatInput
+            model={model.input}
+            edit={options.edit}
+            onCancel={options.onCancel}
+          />
         </ChatReactContext.Provider>
       );
     });
@@ -96,5 +116,90 @@ describe('ChatInput placeholder', () => {
       model.config = { sendWithShiftEnter: true };
     });
     expect(placeholder()).toBe(DEFAULT_PLACEHOLDER);
+  });
+
+  it('keeps the stock editor and toolbar during message editing', () => {
+    render(undefined, { edit: true });
+    expect(container.querySelector('.jp-chat-input-textfield')).not.toBeNull();
+    expect(container.querySelector('.jp-chat-input-toolbar')).not.toBeNull();
+  });
+
+  it('accepts a custom editor through the public ChatBody options', () => {
+    const model = new MockChatModel();
+    const factory: IChatInputFactory = {
+      create: jest.fn(() => <div data-testid="custom-input" />)
+    };
+    act(() => {
+      root.render(
+        <ChatBody
+          model={model}
+          rmRegistry={{} as IRenderMimeRegistry}
+          chatInputFactory={factory}
+        />
+      );
+    });
+    expect(
+      container.querySelector('[data-testid="custom-input"]')
+    ).not.toBeNull();
+    expect(factory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ model: model.input })
+    );
+  });
+
+  it('passes the editing model while retaining attachments and toolbar', () => {
+    const factory: IChatInputFactory = {
+      create: jest.fn((props: ChatInput.IProps) => (
+        <button
+          data-testid="custom-input"
+          onClick={() => {
+            props.model.value = 'draft';
+            props.model.cursorIndex = 3;
+            props.model.focus();
+            props.onCancel?.();
+          }}
+        />
+      ))
+    };
+    const onCancel = jest.fn();
+    const model = render(undefined, { factory, edit: true, onCancel });
+    const focusSpy = jest.spyOn(model.input, 'focus');
+    act(() =>
+      model.input.addAttachment?.({ type: 'file', value: 'notes.txt' })
+    );
+
+    expect(factory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ model: model.input, edit: true, onCancel })
+    );
+    expect(container.querySelector('.jp-chat-input-textfield')).toBeNull();
+    expect(container.querySelector('.jp-chat-input-toolbar')).not.toBeNull();
+    expect(container.textContent).toContain('notes.txt');
+    act(() =>
+      container
+        .querySelector<HTMLElement>('[data-testid="custom-input"]')!
+        .click()
+    );
+    expect(model.input.value).toBe('draft');
+    expect(model.input.cursorIndex).toBe(3);
+    expect(focusSpy).toHaveBeenCalledTimes(1);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('leaves command discovery to the custom editor', () => {
+    const registry = new ChatCommandRegistry();
+    const listCommandCompletions = jest.fn(async () => []);
+    registry.addProvider({
+      id: 'test',
+      listCommandCompletions,
+      onSubmit: async () => {}
+    });
+    const model = render(undefined, {
+      factory: { create: () => <div /> },
+      registry
+    });
+    act(() => {
+      model.input.value = '/test';
+      model.input.cursorIndex = 5;
+    });
+    expect(listCommandCompletions).not.toHaveBeenCalled();
   });
 });

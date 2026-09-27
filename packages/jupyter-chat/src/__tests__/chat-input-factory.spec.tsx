@@ -8,6 +8,7 @@ import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 
 import { ChatInput } from '../components/input/chat-input';
+import { ChatBody } from '../components/chat';
 import { ChatReactContext } from '../context';
 import { IChatInputFactory } from '../tokens';
 import { MockChatModel } from './mocks';
@@ -113,5 +114,26 @@ describe('ChatInput factory', () => {
     render({ create: () => <div data-testid="custom-input" /> });
     expect(container.textContent).toContain('notes.txt');
     expect(container.querySelector('.jp-chat-input-toolbar')).not.toBeNull();
+  });
+
+  it('accepts the public factory through ChatBody options', () => {
+    const factory: IChatInputFactory = {
+      create: jest.fn(() => <div data-testid="custom-input" />)
+    };
+    act(() => {
+      root.render(
+        <ChatBody
+          model={model}
+          rmRegistry={{} as IRenderMimeRegistry}
+          chatInputFactory={factory}
+        />
+      );
+    });
+    expect(
+      container.querySelector('[data-testid="custom-input"]')
+    ).not.toBeNull();
+    expect(factory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ model: model.input })
+    );
   });
 });

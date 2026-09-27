@@ -29,7 +29,7 @@ import {
   IMessagePreambleRegistry
 } from '../registers';
 import { ChatArea } from '../types';
-import { IChatBodyPlaceholderFactory } from '../tokens';
+import { IChatBodyPlaceholderFactory, IChatInputFactory } from '../tokens';
 
 export function ChatBody(props: Chat.IChatProps): JSX.Element {
   const { model } = props;
@@ -184,6 +184,8 @@ export namespace Chat {
      * no messages.
      */
     chatBodyPlaceholderFactory?: IChatBodyPlaceholderFactory;
+    /** Optional replacement for the composer and message-edit input. */
+    chatInputFactory?: IChatInputFactory;
     /**
      * The area where the chat is displayed.
      */

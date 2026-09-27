@@ -45,6 +45,32 @@ package named `@jupyter/chat`.
 This package provides a frontend library (using react), and is intended to be
 used by a jupyterlab extension to create a chat.
 
+To replace the text entry control, provide the optional `IChatInputFactory` token from
+`@jupyter/chat` in a JupyterLab extension. Its `create(props)` method returns a
+React element and receives `ChatInput.IProps`: the `IInputModel`, optional
+`onCancel`, `edit`, and `sx` props. It is used for both the main composer and
+message editing. The replacement runs inside the existing chat React context
+and input container; attachments, toolbar, and drag and drop remain in Jupyter
+Chat. It should use the model's public value, cursor, focus, and send interfaces
+as appropriate. When no factory is provided, the stock text entry control is
+rendered. Consumers constructing `ChatWidget` directly can pass the same
+factory as `chatInputFactory` in `Chat.IOptions`.
+
+```tsx
+import { IChatInputFactory } from '@jupyter/chat';
+import { JupyterFrontEndPlugin } from '@jupyterlab/application';
+
+const inputPlugin: JupyterFrontEndPlugin<IChatInputFactory> = {
+  id: 'my-extension:chat-input',
+  autoStart: true,
+  provides: IChatInputFactory,
+  activate: () => ({ create: props => <MyInput {...props} /> })
+};
+```
+
+`MyInput` receives the public `ChatInput.IProps` and can read the chat command
+registry and other shared options through `useChatContext()`.
+
 #### jupyterlab-chat
 
 The typescript package is located in _packages/jupyterlab-chat_ and

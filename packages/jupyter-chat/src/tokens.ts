@@ -8,6 +8,7 @@ import { Token } from '@lumino/coreutils';
 import { Widget } from '@lumino/widgets';
 
 import { ChatWidget, Placeholder } from './widgets';
+import type { ChatInput } from './components/input/chat-input';
 import { IChatModel } from './model';
 import { ChatArea } from './types';
 
@@ -104,3 +105,17 @@ export const IChatBodyPlaceholderFactory =
     '@jupyter/chat:IChatBodyPlaceholderFactory',
     'The chat body placeholder factory for empty chats'
   );
+
+/** A factory for the text entry control in the composer and message editor. */
+export interface IChatInputFactory {
+  /** Render a text entry control using the stock input's props and model. */
+  create(props: ChatInput.IProps): JSX.Element;
+}
+
+/**
+ * Optional input factory. Without a provider, both inputs use the stock control.
+ */
+export const IChatInputFactory = new Token<IChatInputFactory>(
+  '@jupyter/chat:IChatInputFactory',
+  'The chat input factory'
+);

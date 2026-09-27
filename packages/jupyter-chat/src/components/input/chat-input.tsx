@@ -29,8 +29,13 @@ const INPUT_TOOLBAR_CLASS = 'jp-chat-input-toolbar';
 export function ChatInput(props: ChatInput.IProps): JSX.Element {
   const { model } = props;
   const trans = useTranslator();
-  const { area, chatCommandRegistry, inputToolbarRegistry } = useChatContext();
-  const chatModel = useChatContext().model;
+  const {
+    area,
+    chatCommandRegistry,
+    inputToolbarRegistry,
+    chatInputFactory,
+    model: chatModel
+  } = useChatContext();
 
   const [input, setInput] = useState<string>(model.value);
   const inputRef = useRef<HTMLInputElement>();
@@ -218,84 +223,88 @@ export function ChatInput(props: ChatInput.IProps): JSX.Element {
             />
           </Box>
         )}
-        <Autocomplete
-          {...chatCommands.autocompleteProps}
-          slotProps={{
-            ...(chatCommands.autocompleteProps.slotProps || {}),
-            popper: {
-              placement: 'top-start'
-            },
-            listbox: {
-              sx: {
-                padding: 0
-              }
-            }
-          }}
-          renderInput={params => (
-            <TextField
-              {...params}
-              fullWidth
-              variant="standard"
-              className={INPUT_TEXTFIELD_CLASS}
-              multiline
-              maxRows={10}
-              onKeyDown={handleKeyDown}
-              placeholder={inputPlaceholder}
-              inputRef={inputRef}
-              onSelect={() =>
-                (model.cursorIndex = inputRef.current?.selectionStart ?? null)
-              }
-              sx={{
-                padding: 1.5,
-                margin: 0,
-                boxSizing: 'border-box',
-                backgroundColor: 'var(--jp-layout-color0)',
-                transition: 'background-color 0.2s ease',
-                '& .MuiInputBase-root': {
-                  padding: 0,
-                  margin: 0,
-                  '&:before': {
-                    display: 'none'
-                  },
-                  '&:after': {
-                    display: 'none'
-                  }
-                },
-                '& .MuiInputBase-input': {
-                  overflowWrap: 'break-word',
-                  wordBreak: 'break-word'
+        {chatInputFactory ? (
+          chatInputFactory.create(props)
+        ) : (
+          <Autocomplete
+            {...chatCommands.autocompleteProps}
+            slotProps={{
+              ...(chatCommands.autocompleteProps.slotProps || {}),
+              popper: {
+                placement: 'top-start'
+              },
+              listbox: {
+                sx: {
+                  padding: 0
                 }
-              }}
-              InputProps={{
-                ...params.InputProps,
-                disableUnderline: true
-              }}
-              FormHelperTextProps={{
-                sx: { display: 'none' }
-              }}
-            />
-          )}
-          inputValue={input}
-          onInputChange={(
-            _,
-            newValue: string,
-            reason: AutocompleteInputChangeReason
-          ) => {
-            // Skip value updates when an autocomplete option is selected.
-            // The 'onChange' callback handles the replacement via replaceCurrentWord.
-            // 'selectOption' - user selected an option (newValue is just the option label)
-            // 'reset' - autocomplete is resetting after selection
-            // 'blur' - when user blurs the input (newValue is set to empty string)
-            if (
-              reason === 'selectOption' ||
-              reason === 'reset' ||
-              reason === 'blur'
-            ) {
-              return;
-            }
-            model.value = newValue;
-          }}
-        />
+              }
+            }}
+            renderInput={params => (
+              <TextField
+                {...params}
+                fullWidth
+                variant="standard"
+                className={INPUT_TEXTFIELD_CLASS}
+                multiline
+                maxRows={10}
+                onKeyDown={handleKeyDown}
+                placeholder={inputPlaceholder}
+                inputRef={inputRef}
+                onSelect={() =>
+                  (model.cursorIndex = inputRef.current?.selectionStart ?? null)
+                }
+                sx={{
+                  padding: 1.5,
+                  margin: 0,
+                  boxSizing: 'border-box',
+                  backgroundColor: 'var(--jp-layout-color0)',
+                  transition: 'background-color 0.2s ease',
+                  '& .MuiInputBase-root': {
+                    padding: 0,
+                    margin: 0,
+                    '&:before': {
+                      display: 'none'
+                    },
+                    '&:after': {
+                      display: 'none'
+                    }
+                  },
+                  '& .MuiInputBase-input': {
+                    overflowWrap: 'break-word',
+                    wordBreak: 'break-word'
+                  }
+                }}
+                InputProps={{
+                  ...params.InputProps,
+                  disableUnderline: true
+                }}
+                FormHelperTextProps={{
+                  sx: { display: 'none' }
+                }}
+              />
+            )}
+            inputValue={input}
+            onInputChange={(
+              _,
+              newValue: string,
+              reason: AutocompleteInputChangeReason
+            ) => {
+              // Skip value updates when an autocomplete option is selected.
+              // The 'onChange' callback handles the replacement via replaceCurrentWord.
+              // 'selectOption' - user selected an option (newValue is just the option label)
+              // 'reset' - autocomplete is resetting after selection
+              // 'blur' - when user blurs the input (newValue is set to empty string)
+              if (
+                reason === 'selectOption' ||
+                reason === 'reset' ||
+                reason === 'blur'
+              ) {
+                return;
+              }
+              model.value = newValue;
+            }}
+          />
+        )}
         <Box
           className={INPUT_TOOLBAR_CLASS}
           sx={{

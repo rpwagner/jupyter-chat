@@ -27,7 +27,7 @@
   "style": "style/index.css",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jupyterlab/jupyter-chat.git"
+    "url": "https://github.com/rpwagner/jupyter-chat.git"
   },
   "scripts": {
     "build": "echo 'Building @jupyter/chat' && jlpm build:lib",

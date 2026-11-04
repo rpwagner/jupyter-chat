@@ -4,6 +4,7 @@
  */
 
 import { IRenderMimeRegistry } from '@jupyterlab/rendermime';
+import { Widget } from '@lumino/widgets';
 import React, { act } from 'react';
 import { createRoot, Root } from 'react-dom/client';
 
@@ -14,6 +15,7 @@ import { createRoot, Root } from 'react-dom/client';
 ).IS_REACT_ACT_ENVIRONMENT = true;
 
 import { ChatInput } from '../components/input/chat-input';
+import { InputToolbarRegistry } from '../components/input/toolbar-registry';
 import { ChatBody } from '../components/chat';
 import { ChatReactContext } from '../context';
 import { ChatCommandRegistry, IChatCommandRegistry } from '../registers';
@@ -34,6 +36,7 @@ describe('ChatInput placeholder', () => {
       registry?: IChatCommandRegistry;
       edit?: boolean;
       onCancel?: () => void;
+      toolbar?: InputToolbarRegistry;
     } = {}
   ): MockChatModel => {
     const model = new MockChatModel({ config });
@@ -44,6 +47,7 @@ describe('ChatInput placeholder', () => {
             model,
             rmRegistry: {} as IRenderMimeRegistry,
             chatInputFactory: options.factory,
+            inputToolbarRegistry: options.toolbar,
             chatCommandRegistry: options.registry
           }}
         >
@@ -121,7 +125,9 @@ describe('ChatInput placeholder', () => {
   it('keeps the stock editor and toolbar during message editing', () => {
     render(undefined, { edit: true });
     expect(container.querySelector('.jp-chat-input-textfield')).not.toBeNull();
-    expect(container.querySelector('.jp-chat-input-toolbar')).not.toBeNull();
+    expect(
+      container.querySelector('.jp-chat-input-reactive-toolbar')
+    ).not.toBeNull();
   });
 
   it('accepts a custom editor through the public ChatBody options', () => {
@@ -171,7 +177,9 @@ describe('ChatInput placeholder', () => {
       expect.objectContaining({ model: model.input, edit: true, onCancel })
     );
     expect(container.querySelector('.jp-chat-input-textfield')).toBeNull();
-    expect(container.querySelector('.jp-chat-input-toolbar')).not.toBeNull();
+    expect(
+      container.querySelector('.jp-chat-input-reactive-toolbar')
+    ).not.toBeNull();
     expect(container.textContent).toContain('notes.txt');
     act(() =>
       container
@@ -202,4 +210,46 @@ describe('ChatInput placeholder', () => {
     });
     expect(listCommandCompletions).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'retains reactive and pinned toolbar lifecycle with custom input: %s',
+    custom => {
+      const toolbar = new InputToolbarRegistry();
+      const createWidget = jest.fn(() => {
+        const widget = new Widget();
+        widget.node.textContent = 'Toolbar action';
+        return widget;
+      });
+      toolbar.addItem('action', { position: 10, createWidget });
+      toolbar.addItem('pinned', {
+        position: 20,
+        pinned: true,
+        createWidget
+      });
+      render(undefined, {
+        toolbar,
+        factory: custom ? { create: () => <div /> } : undefined
+      });
+      const reactive = container.querySelector(
+        '.jp-chat-input-reactive-toolbar'
+      )!;
+      const pinned = container.querySelector('.jp-chat-input-pinned-toolbar')!;
+      expect(reactive.textContent).toContain('Toolbar action');
+      expect(pinned.textContent).toContain('Toolbar action');
+      const action = createWidget.mock.results[0].value;
+      const fixed = createWidget.mock.results[1].value;
+
+      act(() => toolbar.hide('action'));
+      expect(action.isHidden).toBe(true);
+      act(() => toolbar.show('action'));
+      expect(action.isHidden).toBe(false);
+      expect(createWidget).toHaveBeenCalledTimes(2);
+      act(() => toolbar.removeItem('action'));
+      expect(action.isDisposed).toBe(true);
+      expect(reactive.textContent).not.toContain('Toolbar action');
+      expect(fixed.isDisposed).toBe(false);
+      act(() => root.unmount());
+      expect(fixed.isDisposed).toBe(true);
+    }
+  );
 });

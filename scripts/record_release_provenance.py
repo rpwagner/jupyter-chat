@@ -13,6 +13,8 @@ import json
 import subprocess
 from pathlib import Path
 
+from packaging.version import Version
+
 
 def main() -> None:
     status = subprocess.run(
@@ -27,7 +29,7 @@ def main() -> None:
         return
 
     version = json.loads(Path("package.json").read_text(encoding="utf-8"))["version"]
-    wheel = f"jupyterlab_chat-{version}-py3-none-any.whl"
+    wheel = f"jupyterlab_chat-{Version(version)}-py3-none-any.whl"
     dist = Path("dist")
     if not (dist / wheel).is_file():
         raise SystemExit(f"Expected validated release wheel missing: {dist / wheel}")

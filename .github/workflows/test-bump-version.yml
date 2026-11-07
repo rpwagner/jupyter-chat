@@ -5,11 +5,15 @@ on:
     branches: ['main']
     paths:
       - 'scripts/bump_version.py'
+      - 'scripts/record_release_provenance.py'
+      - 'scripts/test_record_release_provenance.py'
       - '.github/workflows/test-bump-version.yml'
   pull_request:
     branches: ['*']
     paths:
       - 'scripts/bump_version.py'
+      - 'scripts/record_release_provenance.py'
+      - 'scripts/test_record_release_provenance.py'
       - '.github/workflows/test-bump-version.yml'
 
 concurrency:
@@ -33,6 +37,9 @@ jobs:
         run: |
           git config user.email "test@test.com"
           git config user.name "Test User"
+
+      - name: Test already-versioned release commit hook
+        run: python scripts/test_record_release_provenance.py
 
       - name: Test bump with a specific version
         run: |

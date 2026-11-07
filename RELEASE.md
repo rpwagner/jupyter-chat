@@ -21,6 +21,10 @@ pre-bump the version or regenerate that entry.
 3. Review the draft release and its source SHA. Do not merge changes into
    the release branch between Step 1 and Step 2: Jupyter Releaser checks
    that the source still matches the draft metadata.
+   If the version and changelog are already committed, the supported
+   Jupyter Releaser pre-tag hook records the built distributions' checksums
+   in this guide. That tracked provenance forms the release commit without
+   changing the package version or weakening the source-SHA gate.
 4. Run [Step 2: Publish Release](https://github.com/rpwagner/jupyter-chat/actions/workflows/publish-release.yml)
    from `main` with `branch=main` and the **exact draft release URL**.
    GitHub draft links normally end in `untagged-...`; copied URL tracking
@@ -31,9 +35,9 @@ pre-bump the version or regenerate that entry.
    before changing any downstream consumer.
 
 A failed Step 2 may be retried only when its draft is still valid for
-the current release-branch SHA. If the branch moved, the draft metadata
-is stale: discard that draft and run Step 1 again for the current source,
-rather than bypassing Jupyter Releaser's source-integrity check.
+the current release-branch SHA. If the branch moved (including after merging a release-workflow correction),
+the draft metadata is stale: delete that draft and run Step 1 again for the
+current source. Do not bypass Jupyter Releaser's source-integrity check.
 
 ## Future releases
 

@@ -53,7 +53,7 @@ def main() -> None:
         "",
         heading,
         "",
-        f"Pre-release source commit: \`{source_sha}\`.",
+        f"Pre-release source commit: `{source_sha}`.",
         "The normal Jupyter Releaser build and package checks ran before this record",
         "was generated. Its release commit and GitHub checksum manifest retain",
         "the corresponding distribution checksums.",
@@ -63,7 +63,7 @@ def main() -> None:
     ]
     for path in assets:
         digest = hashlib.sha256(path.read_bytes()).hexdigest()
-        lines.append(f"| \`{path.name}\` | \`{digest}\` |")
+        lines.append(f"| `{path.name}` | `{digest}` |")
     doc.write_text(content.rstrip() + "\n" + "\n".join(lines) + "\n", encoding="utf-8")
     print(f"Recorded {len(assets)} verified distribution hashes for v{version}")
 

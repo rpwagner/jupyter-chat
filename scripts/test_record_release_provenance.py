@@ -65,6 +65,20 @@ class ReleaseProvenanceTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(before, doc.read_text())
 
+    def test_prerelease_wheel_uses_normalized_python_version(self) -> None:
+        (self.root / "package.json").write_text(
+            json.dumps({"version": "0.26.0-alpha.1"})
+        )
+        self.run_git("commit", "-am", "prepare prerelease")
+        dist = self.root / "dist"
+        dist.mkdir()
+        (dist / "jupyterlab_chat-0.26.0a1-py3-none-any.whl").write_bytes(
+            b"prerelease bytes"
+        )
+        result = self.run_hook()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("v0.26.0-alpha.1 distribution hashes", (self.root / "RELEASE.md").read_text())
+
     def test_missing_wheel_fails_closed(self) -> None:
         result = self.run_hook()
         self.assertNotEqual(result.returncode, 0)

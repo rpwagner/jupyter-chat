@@ -57,3 +57,20 @@ an approval under its protection rules.
 
 This is artifact publication only. Installation, combined compatibility,
 browser acceptance, and deployment are separate consumer decisions.
+
+## Fork release provenance
+
+### v0.25.3 distribution hashes
+
+Pre-release source commit: `0fceeead5a2a7bd5d8b3ca4445a40f0e4fe060cf`.
+The normal Jupyter Releaser build and package checks ran before this record
+was generated. Its release commit and GitHub checksum manifest retain
+the corresponding distribution checksums.
+
+| Distribution | SHA-256 |
+| --- | --- |
+| `jupyter-chat-0.25.3.tgz` | `0f4c728df1dac7b2ad639dd7dfb6decde2edb13acf712375b5fcc68042d58b4c` |
+| `jupyterlab-chat-0.25.3.tgz` | `465869971c67a5ab7681baa2928375b0ad02f0313defeab339d1e08957478011` |
+| `jupyterlab-chat-extension-0.25.3.tgz` | `c84e1ea30dcc8993a532dcb397b013da5621247cfdf1aa8a87fcbf2767ef3c22` |
+| `jupyterlab_chat-0.25.3-py3-none-any.whl` | `14c0cfb9e4b79971dc241b9395730dfad236652a1c5f3aaf50e6df5c08c96913` |
+| `jupyterlab_chat-0.25.3.tar.gz` | `dc4af40369cd333b863008e4d3170e1137db8c470daee65478db503f8c0fa701` |

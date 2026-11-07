@@ -3,12 +3,17 @@ on:
   workflow_dispatch:
     inputs:
       version_spec:
-        description: 'New Version Specifier'
-        default: 'next'
-        required: false
+        description: 'Explicit version or releaser spec (e.g. 0.25.3 or next)'
+        required: true
       branch:
         description: 'The branch to target'
+        default: 'main'
         required: false
+      reuse_existing_changelog:
+        description: 'Version is already committed and its changelog entry exists'
+        required: false
+        type: boolean
+        default: false
       post_version_spec:
         description: 'Post Version Specifier'
         required: false
@@ -28,19 +33,59 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: read
+      pull-requests: read
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.branch || 'main' }}
+
       - uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
+
+      - name: Confirm already-versioned source and changelog
+        if: ${{ inputs.reuse_existing_changelog }}
+        env:
+          VERSION_SPEC: ${{ inputs.version_spec }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          version = os.environ["VERSION_SPEC"]
+          root_version = json.loads(Path("package.json").read_text())["version"]
+          if version != root_version:
+              raise SystemExit(f"Existing-release mode requires the current version {root_version}, got {version}")
+          for path in sorted(Path("packages").glob("*/package.json")):
+              package = json.loads(path.read_text())
+              if package.get("version") != version:
+                  raise SystemExit(f"{path} is not at the requested version {version}")
+          py_version = Path("python/jupyterlab-chat/jupyterlab_chat/_version.py").read_text()
+          if f'__version__ = "{version}"' not in py_version:
+              raise SystemExit("Python and JS versions do not match")
+          changelog = Path("CHANGELOG.md").read_text()
+          start_marker = "<!-- <START NEW CHANGELOG ENTRY> -->"
+          end_marker = "<!-- <END NEW CHANGELOG ENTRY> -->"
+          if start_marker not in changelog or end_marker not in changelog:
+              raise SystemExit("Missing active changelog markers")
+          active = changelog.split(start_marker, 1)[1].split(end_marker, 1)[0]
+          if not re.search(rf"^## {re.escape(version)}\s*$", active, re.MULTILINE):
+              raise SystemExit(f"Current changelog does not contain version {version}")
+          PY
 
       - name: Prep Release
         id: prep-release
         uses: jupyter-server/jupyter_releaser/.github/actions/prep-release@v2
+        env:
+          # Preserve upstream's already-populated changelog for an already-versioned fork.
+          RH_STEPS_TO_SKIP: ${{ inputs.reuse_existing_changelog && 'build-changelog' || '' }}
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           version_spec: ${{ github.event.inputs.version_spec }}
           silent: ${{ github.event.inputs.silent }}
           post_version_spec: ${{ github.event.inputs.post_version_spec }}
-          target: ${{ github.event.inputs.target }}
-          branch: ${{ github.event.inputs.branch }}
+          branch: ${{ inputs.branch || 'main' }}
           since: ${{ github.event.inputs.since }}
           since_last_stable: ${{ github.event.inputs.since_last_stable }}
 

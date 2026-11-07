@@ -47,6 +47,9 @@ before-build-npm = [
     "jlpm build:prod"
 ]
 before-build-python = ["jlpm clean"]
+# Jupyter Releaser needs a tracked release commit even when the fork version
+# and changelog were already committed before Step 1.
+before-tag-release = ["python scripts/record_release_provenance.py"]
 before-bump-version = [
     "python -m pip install -U jupyterlab",
     "jlpm"

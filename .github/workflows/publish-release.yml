@@ -3,56 +3,100 @@ on:
   workflow_dispatch:
     inputs:
       branch:
-        description: 'The target branch'
+        description: 'The release branch (must match the draft)'
+        default: 'main'
         required: false
       release_url:
-        description: 'The URL of the draft GitHub release'
-        required: false
-      steps_to_skip:
-        description: 'Comma separated list of steps to skip'
-        required: false
+        description: 'The draft GitHub release URL (untagged-... links are supported)'
+        required: true
 
 jobs:
   publish_release:
+    # Fork releases publish GitHub assets only, never npm or PyPI.
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     environment: release
     permissions:
-      id-token: write
+      contents: write
+      issues: read
+      pull-requests: read
     steps:
+      - name: Resolve the exact draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          INPUT_RELEASE_URL: ${{ inputs.release_url }}
+          TARGET_BRANCH: ${{ inputs.branch || 'main' }}
+        run: |
+          set -euo pipefail
+          # GitHub uses an "untagged-..." URL while a release is draft.
+          # Normalize links copied from browsers or chat.
+          release_url="${INPUT_RELEASE_URL%%\?*}"
+          release_url="${release_url%%\#*}"
+          if [[ "$release_url" != "https://github.com/${GH_REPO}/releases/tag/"* ]]; then
+            echo "::error::Supply this fork's GitHub draft release URL"
+            exit 1
+          fi
+          release=$(
+            gh api --paginate "repos/${GH_REPO}/releases?per_page=100" |
+              jq -sce --arg url "$release_url" --arg branch "$TARGET_BRANCH" '
+                [.[][] | select(.draft == true and .html_url == $url and .target_commitish == $branch)]
+                | if length == 1 then .[0] else empty end
+              '
+          )
+          tag=$(jq -r '.tag_name' <<< "$release")
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([a-zA-Z0-9._-]*)?$ ]]; then
+            echo "::error::The selected draft has an invalid version tag"
+            exit 1
+          fi
+          if ! jq -e '.assets | any(.name == "metadata.json")' <<< "$release" > /dev/null; then
+            echo "::error::This draft is missing Jupyter Releaser metadata"
+            exit 1
+          fi
+          printf 'RELEASE_URL=%s\nRELEASE_TAG=%s\n' "$release_url" "$tag" >> "$GITHUB_ENV"
+          echo "Verified draft $tag on $TARGET_BRANCH." >> "$GITHUB_STEP_SUMMARY"
+
       - uses: jupyterlab/maintainer-tools/.github/actions/base-setup@v1
 
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.APP_PRIVATE_KEY }}
-
-      - name: Populate Release
+      - name: Populate release with validated distributions
         id: populate-release
         uses: jupyter-server/jupyter_releaser/.github/actions/populate-release@v2
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          branch: ${{ github.event.inputs.branch }}
-          release_url: ${{ github.event.inputs.release_url }}
-          steps_to_skip: ${{ github.event.inputs.steps_to_skip }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ inputs.branch || 'main' }}
+          release_url: ${{ env.RELEASE_URL }}
 
-      - name: Finalize Release
+      - name: Finalize GitHub release without registry publication
         id: finalize-release
-        env:
-          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         uses: jupyter-server/jupyter_releaser/.github/actions/finalize-release@v2
         with:
-          token: ${{ steps.app-token.outputs.token }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ inputs.branch || 'main' }}
           release_url: ${{ steps.populate-release.outputs.release_url }}
+          # The first step uploads GitHub assets; neither registry
+          # publication nor a changelog forwardport is authorized.
+          steps_to_skip: publish-assets,forwardport-changelog
 
-      - name: '** Next Step **'
-        if: ${{ success() }}
+      - name: Verify published GitHub wheel and checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          echo "Verify the final release"
-          echo ${{ steps.finalize-release.outputs.release_url }}
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --json isDraft,assets > "$RUNNER_TEMP/release.json"
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
 
-      - name: '** Failure Message **'
-        if: ${{ failure() }}
-        run: |
-          echo "Failed to Publish the Draft Release Url:"
-          echo ${{ steps.populate-release.outputs.release_url }}
+          tag = os.environ["RELEASE_TAG"]
+          data = json.loads((Path(os.environ["RUNNER_TEMP"]) / "release.json").read_text())
+          assets = {asset["name"] for asset in data["assets"]}
+          wheel = f"jupyterlab_chat-{tag.removeprefix('v')}-py3-none-any.whl"
+          if data["isDraft"]:
+              raise SystemExit("Release is still draft after finalization")
+          if wheel not in assets or "asset_shas.json" not in assets:
+              raise SystemExit(f"Required wheel or SHA-256 manifest missing: {sorted(assets)}")
+          print(f"Published {tag}: {wheel} and asset_shas.json")
+          PY
+          echo "GitHub-only release $RELEASE_TAG published; no npm/PyPI upload." >> "$GITHUB_STEP_SUMMARY"
